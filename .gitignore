@@ -1,0 +1,6 @@
+# 16.10.26 KW: Zugangsdaten, lokale Umgebung und lokal gespeichertes Modell nicht ins Repo
+.env
+.venv/
+__pycache__/
+*.pyc
+modell/

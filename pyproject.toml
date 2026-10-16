@@ -1,0 +1,15 @@
+[project]
+name = "kaspar-mlops-projekt"
+version = "0.1.0"
+description = "Projektarbeit MLOps (CAS AI Operations, FHNW HS26): Regen-Vorhersage mit FTI-Pipelines und Hopsworks Feature Store"
+authors = [{ name = "Kaspar Walter" }]
+readme = "README.md"
+# 16.10.26 KW: Hopsworks verlangt Python < 3.14, gewählt ist 3.12 (siehe .python-version)
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "hopsworks[python]>=4.2",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "requests>=2.32",
+    "python-dotenv>=1.0",
+]
