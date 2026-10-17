@@ -1,5 +1,6 @@
 # 16.10.26 KW: Gemeinsame Bausteine der drei Pipelines (Konfiguration, Datenabruf, Hopsworks-Login)
 import os
+import time
 
 import pandas as pd
 import requests
@@ -27,28 +28,35 @@ def hopsworks_login():
     import hopsworks
 
     load_dotenv()
+    # 17.10.26 KW: Der Hopsworks-Client schreibt Zertifikate fest nach /tmp. Unter Windows (= C:\tmp) fehlt der Ordner.
+    os.makedirs("/tmp", exist_ok=True)
     return hopsworks.login(
         api_key_value=os.environ["HOPSWORKS_API_KEY"],
         project=os.environ.get("HOPSWORKS_PROJECT") or None,
     )
 
 
+def api_abruf(params: dict) -> dict:
+    """Ruft Open-Meteo auf. 17.10.26 KW: Bis zu 3 Versuche, die API meldet gelegentlich kurz 503."""
+    for versuch in range(3):
+        antwort = requests.get(API_URL, params=params, timeout=30)
+        if antwort.status_code != 503 or versuch == 2:
+            antwort.raise_for_status()
+            return antwort.json()
+        time.sleep(5)
+
+
 def lade_stundenwerte(tage: int = 92) -> pd.DataFrame:
     """Holt stündliche Wetterwerte der letzten Tage von Open-Meteo (kein API-Key nötig)."""
-    antwort = requests.get(
-        API_URL,
-        params={
-            "latitude": BREITE,
-            "longitude": LAENGE,
-            "hourly": "relative_humidity_2m,cloud_cover,precipitation",
-            "past_days": tage,
-            "forecast_days": 1,
-            "timezone": "UTC",
-        },
-        timeout=30,
-    )
-    antwort.raise_for_status()
-    df = pd.DataFrame(antwort.json()["hourly"])
+    daten = api_abruf({
+        "latitude": BREITE,
+        "longitude": LAENGE,
+        "hourly": "relative_humidity_2m,cloud_cover,precipitation",
+        "past_days": tage,
+        "forecast_days": 1,
+        "timezone": "UTC",
+    })
+    df = pd.DataFrame(daten["hourly"])
     df["zeitpunkt"] = pd.to_datetime(df["time"], utc=True)
     # 16.10.26 KW: Die API liefert auch Prognosestunden, für die Features zählen nur vergangene Stunden
     jetzt = pd.Timestamp.now(tz="UTC").floor("h")
@@ -58,13 +66,8 @@ def lade_stundenwerte(tage: int = 92) -> pd.DataFrame:
 
 def lade_aktuelle_bewoelkung() -> float:
     """RT-Feature: aktueller Bewölkungsgrad in Prozent, erst zum Zeitpunkt der Inferenz bekannt."""
-    antwort = requests.get(
-        API_URL,
-        params={"latitude": BREITE, "longitude": LAENGE, "current": "cloud_cover", "timezone": "UTC"},
-        timeout=30,
-    )
-    antwort.raise_for_status()
-    return float(antwort.json()["current"]["cloud_cover"])
+    daten = api_abruf({"latitude": BREITE, "longitude": LAENGE, "current": "cloud_cover", "timezone": "UTC"})
+    return float(daten["current"]["cloud_cover"])
 
 
 def berechne_features(roh: pd.DataFrame) -> pd.DataFrame:

@@ -52,7 +52,8 @@ def main():
         description="Logistische Regression: Regen in den nächsten 2 Stunden in Windisch (Kaspar Walter)",
         input_example=X_test.head(1),
     )
-    registry_modell.save(str(MODELL_ORDNER))
+    # 17.10.26 KW: keep_original_files, sonst verschiebt Hopsworks die lokale Datei in die Registry
+    registry_modell.save(str(MODELL_ORDNER), keep_original_files=True)
     print(f"Modell '{MODELL_NAME}' v{registry_modell.version} in der Model Registry gespeichert.")
 
 

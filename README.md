@@ -71,7 +71,7 @@ Code in `pipelines/`, gemeinsame Bausteine (Konfiguration, API-Abruf, Feature-Be
 
 ## Installation und Ausführung
 
-**Voraussetzungen:** Python 3.12 (Hopsworks verlangt < 3.14), [uv](https://docs.astral.sh/uv/), ein kostenloser Account auf [hopsworks.ai](https://www.hopsworks.ai/) mit API-Key. Alle Abhängigkeiten sind in `pyproject.toml` definiert und in `uv.lock` fixiert.
+**Voraussetzungen:** Python 3.12 (Hopsworks verlangt < 3.14), [uv](https://docs.astral.sh/uv/), ein kostenloser Account auf [hopsworks.ai](https://www.hopsworks.ai/) mit einem Projekt und einem API-Key. Getestet unter Windows 11, läuft auch unter Linux/macOS bzw. in GitHub Codespaces. Alle Abhängigkeiten sind in `pyproject.toml` definiert und in `uv.lock` fixiert.
 
 ```bash
 git clone <dieses Repository>
@@ -88,6 +88,16 @@ uv run python pipelines/training_pipeline.py
 uv run python pipelines/inference_pipeline.py
 ```
 
+Beispielausgabe der Inference-Pipeline (17.10.2026):
+
+```
+Luftfeuchtigkeit Mittel 24h (Feature Store, Stand 2026-10-17 08:00:00+00:00): 89.1 %
+Bewölkung jetzt (live): 100 %
+Modell: regen_modell v2
+Regenwahrscheinlichkeit nächste 2 Stunden: 63%
+Schirm einpacken!
+```
+
 Für aktuelle Features vor jeder Inferenz die Feature-Pipeline erneut ausführen, im Betrieb z. B. stündlich per Scheduler. Die Training-Pipeline läuft nur bei Bedarf (Re-Training).
 
 ## Reflexion und Limitationen
@@ -100,4 +110,13 @@ Für aktuelle Features vor jeder Inferenz die Feature-Pipeline erneut ausführen
 - **Keine Orchestrierung:** Die Pipelines werden manuell gestartet. Für den Betrieb fehlen Scheduler, Monitoring (Drift) und das Zurückspielen der Ground Truth in den Feature Store.
 - **Modellauswahl:** Die Inferenz nimmt das Modell mit der besten Accuracy. Im Betrieb würde man eine Version explizit freigeben (z. B. per Tag oder Alias).
 
-<!-- Schwierigkeiten beim Ausführen hier ergänzen, falls welche auftreten (KW) -->
+## Schwierigkeiten und Lösungen
+
+Alle drei Pipelines laufen vollständig (getestet am 17.10.2026 unter Windows 11 gegen Hopsworks Serverless). Unterwegs gab es diese Hürden:
+
+- **Client-Version:** Der aktuelle Client (5.2) warnte, dass der Server auf 5.1 läuft. Darum ist `hopsworks[python]==5.1.*` fixiert.
+- **Windows und `/tmp`:** Der Hopsworks-Client legt Zertifikate fest unter `/tmp` ab. Unter Windows entspricht das `C:\tmp`, das standardmässig fehlt. `gemeinsam.py` legt den Ordner deshalb vor dem Login an (unter Linux/macOS ohne Wirkung).
+- **Delta-Format unter Windows:** Hopsworks 5.1 legt neue Feature Groups standardmässig im Format DELTA an. Das braucht das Paket `deltalake`, das es nur für Linux und macOS gibt. Die Feature Group verwendet darum explizit `time_travel_format="HUDI"`. Geschrieben wird dann über einen Materialisierungs-Job in Hopsworks (dauert ca. 2 Minuten).
+- **Präfix der Event Time:** `get_batch_data(event_time=True)` liefert die Spalte als `<projekt>_wetter_windisch_1_zeitpunkt`. Die Inference-Pipeline sucht sie darum über die Endung `zeitpunkt`.
+- **Lokale Modelldatei:** `model.save()` verschiebt die Datei standardmässig in die Registry. Mit `keep_original_files=True` bleibt die lokale Kopie wie verlangt erhalten.
+- **Open-Meteo 503:** Die API antwortete einmal kurz mit «Service Unavailable». Abrufe werden darum bis zu dreimal wiederholt.

@@ -24,6 +24,9 @@ def main():
         description="Stündliche Wetter-Features Windisch für die Regen-Vorhersage (Kaspar Walter)",
         primary_key=["ort", "zeit_id"],
         event_time="zeitpunkt",
+        # 17.10.26 KW: Standard DELTA braucht das Paket deltalake, das es für Windows nicht gibt.
+        # HUDI schreibt über einen Materialisierungs-Job in Hopsworks und läuft auf jedem OS.
+        time_travel_format="HUDI",
     )
     # 5. Dataframe einfügen. 16.10.26 KW: Standard ist Upsert, gleicher Primary Key = Update, darum keine Duplikate.
     # wait=True wartet auf den Materialisierungs-Job, damit die Training-Pipeline danach die Daten sieht.

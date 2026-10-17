@@ -20,7 +20,9 @@ def main():
     fv = fs.get_feature_view(FEATURE_VIEW, version=VERSION)
     seit = datetime.now(timezone.utc) - timedelta(days=2)
     batch = fv.get_batch_data(start_time=seit, event_time=True)
-    neueste = batch.sort_values("zeitpunkt").iloc[-1]
+    # 17.10.26 KW: Hopsworks liefert die Event Time mit Präfix (<projekt>_<feature_group>_<version>_zeitpunkt)
+    zeitspalte = next(spalte for spalte in batch.columns if spalte.endswith("zeitpunkt"))
+    neueste = batch.sort_values(zeitspalte).iloc[-1]
 
     # 3. Modell aus der Model Registry herunterladen. 16.10.26 KW: bestes Modell nach Accuracy
     registry_modell = projekt.get_model_registry().get_best_model(MODELL_NAME, "accuracy", "max")
@@ -30,7 +32,7 @@ def main():
     eingabe = pd.DataFrame([{"feuchte_mittel_24h": neueste["feuchte_mittel_24h"], "bewoelkung": bewoelkung}])[FEATURES]
     wahrscheinlichkeit = modell.predict_proba(eingabe)[0][1]
 
-    print(f"Luftfeuchtigkeit Mittel 24h (Feature Store, Stand {neueste['zeitpunkt']}): {neueste['feuchte_mittel_24h']:.1f} %")
+    print(f"Luftfeuchtigkeit Mittel 24h (Feature Store, Stand {neueste[zeitspalte]}): {neueste['feuchte_mittel_24h']:.1f} %")
     print(f"Bewölkung jetzt (live): {bewoelkung:.0f} %")
     print(f"Modell: {MODELL_NAME} v{registry_modell.version}")
     print(f"Regenwahrscheinlichkeit nächste 2 Stunden: {wahrscheinlichkeit:.0%}")
