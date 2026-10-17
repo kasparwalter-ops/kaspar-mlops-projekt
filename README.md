@@ -4,7 +4,7 @@
 
 *Muss ich einen Schirm einpacken?* Das Projekt sagt voraus, ob es in Windisch in den nächsten zwei Stunden regnet. Ziel ist nicht ein gutes Modell, sondern eine saubere **FTI-Architektur** (Feature, Training, Inference) mit dem **Hopsworks Feature Store**.
 
-> Hinweis zur Umsetzung: Wie vom Dozenten erlaubt, habe ich die Arbeit mit Unterstützung von Claude (Anthropic) umgesetzt. Konzept, Prüfung und Verantwortung liegen bei mir.
+> Hinweis zur Umsetzung: Wie vom Dozenten erlaubt, habe ich mir bei der Umsetzung von KI helfen lassen. Konzept, Prüfung und Verantwortung liegen bei mir.
 
 ## Überblick
 
@@ -23,7 +23,7 @@
                                                      "Regenwahrscheinlichkeit 2h: 73 %"
 ```
 
-Die drei Pipelines sind unabhängige Skripte. Sie kommunizieren nur über den Feature Store und die Model Registry, nie direkt miteinander.
+Die drei Pipelines sind unabhängige Skripte. Sie kommunizieren nur über den Feature Store und die Model Registry.
 
 ## Daten
 
@@ -110,7 +110,7 @@ cp .env.example .env      # danach HOPSWORKS_API_KEY und HOPSWORKS_PROJECT eintr
 Die Pipelines in dieser Reihenfolge ausführen:
 
 ```bash
-uv run python pipelines/feature_pipeline.py     # dauert einige Minuten (Materialisierungs-Job in Hopsworks)
+uv run python pipelines/feature_pipeline.py
 uv run python pipelines/training_pipeline.py
 uv run python pipelines/inference_pipeline.py
 ```
@@ -125,25 +125,23 @@ Regenwahrscheinlichkeit nächste 2 Stunden: 63%
 Schirm einpacken!
 ```
 
-Für aktuelle Features vor jeder Inferenz die Feature-Pipeline erneut ausführen, im Betrieb z. B. stündlich per Scheduler. Die Training-Pipeline läuft nur bei Bedarf (Re-Training).
 
 ## Reflexion und Limitationen
 
-- **Alter des aggregierten Features:** Weil das Label die zwei Folgestunden braucht, fehlen die letzten zwei Stunden in der Feature Group. Das 24-h-Mittel bei der Inferenz ist darum rund 3 Stunden alt. Bei einem 24-h-Mittel ist der Effekt klein. Sauberer wäre eine Trennung von Features und Labels in zwei Feature Groups (Spine Group, Ausbaustufe).
-- **«Messwerte» sind Modellwerte:** Die vergangenen Stunden von Open-Meteo sind Wettermodell-Daten, keine Stationsmessungen. Für den Zweck der Arbeit genügt das.
+- **«Messwerte» sind Modellwerte:** Die vergangenen Stunden von Open-Meteo sind Wettermodell-Daten, keine Stationsmessungen.
 - **Zufälliger statt zeitlicher Split:** `train_test_split` mischt die Stunden zufällig. Benachbarte Stunden sind sich sehr ähnlich, die Testmetriken sind deshalb zu optimistisch. Ein zeitlicher Split (Backtesting) wäre realistischer.
 - **Wenig Daten:** Rund 60 nutzbare Tage aus einer Jahreszeit decken Saisonalität nicht ab. Längere Historie gäbe die Archive-API von Open-Meteo.
-- **Schwaches Modell:** Zwei Features erklären Regen nur grob. Luftdruck oder Niederschlag der Vorstunden wären stärker, waren aber bewusst nicht Ziel.
+
 - **Keine Orchestrierung:** Die Pipelines werden manuell gestartet. Für den Betrieb fehlen Scheduler, Monitoring (Drift) und das Zurückspielen der Ground Truth in den Feature Store.
-- **Modellauswahl:** Die Inferenz nimmt das Modell mit der besten Accuracy. Im Betrieb würde man eine Version explizit freigeben (z. B. per Tag oder Alias).
+- **Modellauswahl:** Die Inferenz nimmt das Modell mit der besten Accuracy.
 
 ## Schwierigkeiten und Lösungen
 
 Alle drei Pipelines laufen vollständig (getestet am 17.10.2026 unter Windows 11 gegen Hopsworks Serverless). Unterwegs gab es diese Hürden:
 
 - **Client-Version:** Der aktuelle Client (5.2) warnte, dass der Server auf 5.1 läuft. Darum ist `hopsworks[python]==5.1.*` fixiert.
-- **Windows und `/tmp`:** Der Hopsworks-Client legt Zertifikate fest unter `/tmp` ab. Unter Windows entspricht das `C:\tmp`, das standardmässig fehlt. `gemeinsam.py` legt den Ordner deshalb vor dem Login an (unter Linux/macOS ohne Wirkung).
-- **Delta-Format unter Windows:** Hopsworks 5.1 legt neue Feature Groups standardmässig im Format DELTA an. Das braucht das Paket `deltalake`, das es nur für Linux und macOS gibt. Die Feature Group verwendet darum explizit `time_travel_format="HUDI"`. Geschrieben wird dann über einen Materialisierungs-Job in Hopsworks (dauert ca. 2 Minuten).
+- **Windows und `/tmp`:** Der Hopsworks-Client legt Zertifikate fest unter `/tmp` ab. Unter Windows entspricht das `C:\tmp`, das standardmässig fehlt. `gemeinsam.py` legt den Ordner deshalb vor dem Login an.
+- **Delta-Format unter Windows:** Hopsworks 5.1 legt neue Feature Groups standardmässig im Format DELTA an. Das braucht das Paket `deltalake`, das es nur für Linux und macOS gibt. Die Feature Group verwendet darum explizit `time_travel_format="HUDI"`. Geschrieben wird dann über einen Materialisierungs-Job in Hopsworks (dauert ca. 2 Minuten). Dank an Claude für diese Lösung! :-)
 - **Präfix der Event Time:** `get_batch_data(event_time=True)` liefert die Spalte als `<projekt>_wetter_windisch_1_zeitpunkt`. Die Inference-Pipeline sucht sie darum über die Endung `zeitpunkt`.
 - **Lokale Modelldatei:** `model.save()` verschiebt die Datei standardmässig in die Registry. Mit `keep_original_files=True` bleibt die lokale Kopie wie verlangt erhalten.
-- **Open-Meteo 503:** Die API antwortete einmal kurz mit «Service Unavailable». Abrufe werden darum bis zu dreimal wiederholt.
+- **Open-Meteo 503:** Die API antwortete einmal  mit «Service Unavailable». Abrufe werden darum bis zu dreimal wiederholt, sollten sie fehlschlagen.
