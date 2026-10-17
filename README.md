@@ -69,9 +69,36 @@ Code in `pipelines/`, gemeinsame Bausteine (Konfiguration, API-Abruf, Feature-Be
 3. Bestes Modell (nach Accuracy) aus der Model Registry herunterladen
 4. Prediction aus beiden Features, Ausgabe der Regenwahrscheinlichkeit
 
+## Abhängigkeiten
+
+Getestet am 17.10.2026 unter Windows 11. Linux/macOS bzw. GitHub Codespaces sollten ebenfalls funktionieren, sind aber nicht getestet.
+
+**Werkzeuge und Dienste**
+
+| Werkzeug / Dienst | Verwendete Version | Bemerkung |
+|---|---|---|
+| Python | 3.12.10 | Hopsworks verlangt < 3.14. Festgelegt in `.python-version` und `pyproject.toml` (`>=3.12,<3.13`) |
+| uv | 0.12.18 | Paket- und Umgebungsverwaltung. Installiert Python 3.12 bei Bedarf selbst |
+| Git | 2.49 | Zum Klonen |
+| Hopsworks Serverless | Server 5.1 (Region eu-west) | Kostenloser Account mit Projekt und API-Key nötig |
+| Open-Meteo Forecast API | v1 | Frei, kein Account und kein Key nötig |
+
+**Python-Pakete** (direkt in `pyproject.toml`, exakte Versionen inkl. aller Unterabhängigkeiten in `uv.lock`)
+
+| Paket | Version | Zweck |
+|---|---|---|
+| `hopsworks[python]` | 5.1.2 (fixiert auf 5.1.*) | Feature Store und Model Registry. Muss zur Serverversion passen |
+| `pandas` | 2.3.3 | Datenaufbereitung, Rolling Window |
+| `scikit-learn` | 1.9.1 | Logistische Regression, Split, Metriken |
+| `requests` | 2.34.2 | Abruf Open-Meteo |
+| `python-dotenv` | 1.2.4 | Liest API-Key und Projektname aus `.env` |
+| `joblib` | 1.6.0 | Modell speichern/laden (kommt mit scikit-learn) |
+
+`uv sync` installiert genau die Versionen aus `uv.lock`, die Umgebung ist damit reproduzierbar.
+
 ## Installation und Ausführung
 
-**Voraussetzungen:** Python 3.12 (Hopsworks verlangt < 3.14), [uv](https://docs.astral.sh/uv/), ein kostenloser Account auf [hopsworks.ai](https://www.hopsworks.ai/) mit einem Projekt und einem API-Key. Getestet unter Windows 11, läuft auch unter Linux/macOS bzw. in GitHub Codespaces. Alle Abhängigkeiten sind in `pyproject.toml` definiert und in `uv.lock` fixiert.
+**Voraussetzungen:** uv und Git installiert, Hopsworks-Account mit Projekt und API-Key (siehe Abhängigkeiten).
 
 ```bash
 git clone <dieses Repository>
